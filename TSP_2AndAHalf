@@ -1,0 +1,186 @@
+import java.util.*;
+
+float[][] points;
+//public boolean[] edges;
+ArrayList<Integer> pointsOrdered;
+float totalDistance;
+
+void setup(){
+  size(600, 600);
+  stroke(50, 250, 30);
+  //randomSeed(0);
+  
+  int pts = 200;
+  points = new float[pts][2];
+  for (int i = 0; i < points.length; i++){
+    float[] point = points[i];
+    for (int j = 0; j < point.length; j++){
+      point[j] = random(500)+50;
+    }
+  }
+  
+  //edges = new boolean[((points.length-1)*points.length)/2];
+  //for (int i = 0; i < edges.length; i++){
+  //  edges[i] = false;
+  //}
+  
+  pointsOrdered = new ArrayList<Integer>();
+  int lastPoint = 0;
+  pointsOrdered.add(lastPoint);
+  
+  for (int i = 1; i < pts; i++){
+    float minDistance = Float.MAX_VALUE;
+    int minPoint = 0;
+    for (int p = 1; p < pts; p++){
+      if (!pointsOrdered.contains(p)){
+        float distance = getDistance(p, lastPoint);
+        if (minDistance > distance){
+          minDistance = distance;
+          minPoint = p;
+        }
+      }
+    }
+    pointsOrdered.add(minPoint);
+    lastPoint = minPoint;
+  }
+  
+  totalDistance = 0;
+  for (int i = 0; i < pointsOrdered.size(); i++){
+    int j = point(i+1);
+    totalDistance += getDistance(pointsOrdered.get(i), pointsOrdered.get(j));
+  }
+}
+
+int point(int i){
+  return (i+pointsOrdered.size())%pointsOrdered.size();
+}
+
+int pointsToEdge(int p1, int p2){
+  int min = min(p1, p2);
+  int max = max(p1, p2);
+  if (min == max || min < 0 || max >= points.length){
+    throw new IndexOutOfBoundsException("Invalid pair of points ("+p1+", "+p2+")");
+  }
+  return (min + (max*(max-1))/2);
+}
+
+int pointsToEdgeMax(int edgeIndex){
+  return floor(sqrt(2*edgeIndex + 0.25) + 0.5001);
+}
+
+int pointsToEdgeMin(int edgeIndex){
+  int max = pointsToEdgeMax(edgeIndex);
+  return edgeIndex - (max*(max-1))/2;
+}
+
+public float getDistance(int p1, int p2){
+  float dist = 0;
+  for (int i = 0; i < points[0].length; i++){
+    float disp = points[p1][i]-points[p2][i];
+    dist += disp*disp;
+  }
+  return (float)Math.sqrt(dist);
+}
+
+int pos0 = 0, from0to3 = 3;
+
+void draw(){
+  /** Redraw the points and edges */
+  if (pos0 == 0 && from0to3 == 3){
+    clear();
+    for (int i = 0; i < pointsOrdered.size(); i++){
+      int j = point(i+1);
+      float[] p0 = points[pointsOrdered.get(i)];
+      float[] p1 = points[pointsOrdered.get(j)];
+      line(p0[0], p0[1], p1[0], p1[1]);
+    }
+    noStroke();
+    for (int i = 0; i < points.length; i++){
+      if (i == pointsOrdered.get(1)) { fill(30, 50, 250); }
+      else { fill(250, 250, 250); }
+      float[] p = points[i];
+      circle(p[0], p[1], 60/sqrt(points.length));
+    }
+    fill(250, 250, 250);
+    stroke(50, 250, 30);
+    text("Current distance: "+totalDistance, 30, 570);
+    line(50, 30, 550, 30);
+  } else if (pos0 > points.length - 5) {
+    noLoop();
+    text("FINISHED", 30, 585);
+  } else {
+    line(50, 20, 50 + (500.0*pos0)/(points.length - 5), 20);
+  }
+  
+  
+  /** Check to see if a new combination of points is better than the current path */
+  
+  // All of these 'pos' values correspond to a point at that position in  pointsOrdered
+  int pos1 = point(pos0+1), pos2 = point(pos1+1);
+  int pos3 = point(pos0+from0to3), pos4 = point(pos3+1);
+  int[] pos = {pos0, pos1, pos2, pos3, pos4}, point = new int[pos.length];
+  for (int i = 0; i < pos.length; i++){
+    point[i] = pointsOrdered.get(pos[i]);
+  }
+  // The setsOfPoints represent 3 lines - from A to B, C to D, and E to F 
+  int[][] setsOfPoints = {{point[0], point[1], point[1], point[2], point[3], point[4]},  // The current path
+                          {point[0], point[1], point[1], point[3], point[2], point[4]},
+                          {point[0], point[2], point[3], point[1], point[1], point[4]},
+                          {point[0], point[3], point[2], point[1], point[1], point[4]}};
+  float minDistances = Float.MAX_VALUE;
+  int minSet = 0;
+  for (int s = 0; s < setsOfPoints.length; s++){
+    float distances = 0;
+    for (int i = 0; i < setsOfPoints[s].length; i+=2){
+      int j = i+1;
+      distances += getDistance(setsOfPoints[s][i], setsOfPoints[s][j]);
+    }
+    if (minDistances > distances){
+      if (s > 0){  // Update totalDistance if a new best distance is found
+        totalDistance -= minDistances;
+        totalDistance += distances;
+      }
+      minSet = s;
+      minDistances = distances;
+    }
+  }
+  
+  if (minSet > 0){
+    ArrayList<Integer> pointsBetween4and0 = new ArrayList<Integer>();
+    for (int i = point(pos4+1); i != pos0; i = point(i+1)){
+      pointsBetween4and0.add(pointsOrdered.get(i));
+    }
+    ArrayList<Integer> pointsBetween2and3 = new ArrayList<Integer>();
+    for (int i = point(pos2+1); i != pos3; i = point(i+1)){
+      pointsBetween2and3.add(pointsOrdered.get(i));
+    }
+    
+    ArrayList<Integer> pointsReordered = new ArrayList<Integer>();
+    int[] set = setsOfPoints[minSet];
+    pointsReordered.add(set[0]);
+    pointsReordered.add(set[1]);
+    if (set[1] == set[2]){
+      pointsReordered.add(set[3]);
+      Collections.reverse(pointsBetween2and3);
+      pointsReordered.addAll(pointsBetween2and3);
+    } else {
+      if (set[1] == point[3]){
+        Collections.reverse(pointsBetween2and3);
+      }
+      pointsReordered.addAll(pointsBetween2and3);
+      pointsReordered.add(set[2]);
+    }
+    pointsReordered.add(set[4]);
+    pointsReordered.add(set[5]);
+    pointsReordered.addAll(pointsBetween4and0);
+    pointsOrdered = pointsReordered;
+    
+    pos0 = 0;
+    from0to3 = 3;
+  } else if (from0to3 == points.length-2){
+    pos0++;
+    from0to3 = 3;
+  } else {
+    from0to3++;
+  }
+}
